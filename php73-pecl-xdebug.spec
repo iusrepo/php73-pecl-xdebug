@@ -1,3 +1,5 @@
+# IUS spec file for php73-pecl-xdebug, forked from:
+#
 # Fedora spec file for php-pecl-xdebug
 #
 # Copyright (c) 2010-2019 Remi Collet
@@ -14,29 +16,26 @@
 
 %global pecl_name  xdebug
 %global with_zts   0%{!?_without_zts:%{?__ztsphp:1}}
-%global gh_commit  e4de4be71911ba933e4f9240dbcc3f45af53c6da
-%global gh_short   %(c=%{gh_commit}; echo ${c:0:7})
 # XDebug should be loaded after opcache
 %global ini_name   15-%{pecl_name}.ini
 %global with_tests 0%{!?_without_tests:1}
-# version/release
-%global upstream_version 2.7.2
-#global upstream_prever  RC2
+%global php        php73
 
-Name:           php-pecl-xdebug
+Name:           %{php}-pecl-%{pecl_name}
 Summary:        PECL package for debugging PHP scripts
-Version:        %{upstream_version}%{?upstream_prever:~%%{upstream_prever}}
-Release:        1%{?dist}
-Source0:        https://github.com/%{pecl_name}/%{pecl_name}/archive/%{gh_commit}/%{pecl_name}-%{upstream_version}%{?upstream_prever}-%{gh_short}.tar.gz
+Version:        2.7.2
+Release:        2%{?dist}
+Source0:        https://github.com/%{pecl_name}/%{pecl_name}/archive/%{version}/%{pecl_name}-%{version}.tar.gz
 
 # The Xdebug License, version 1.01
 # (Based on "The PHP License", version 3.0)
 License:        PHP
 URL:            https://xdebug.org/
 
-BuildRequires:  php-pear  > 1.9.1
-BuildRequires:  php-devel > 7
-BuildRequires:  php-simplexml
+# build require  pear1's dependencies to avoid mismatched php stacks
+BuildRequires:  pear1 %{php}-cli %{php}-common %{php}-xml
+BuildRequires:  %{php}-devel
+BuildRequires:  %{php}-xml
 BuildRequires:  libedit-devel
 BuildRequires:  libtool
 
@@ -47,6 +46,11 @@ Provides:       php-%{pecl_name} = %{version}
 Provides:       php-%{pecl_name}%{?_isa} = %{version}
 Provides:       php-pecl(Xdebug) = %{version}
 Provides:       php-pecl(Xdebug)%{?_isa} = %{version}
+
+# safe replacement
+Provides:       php-pecl-%{pecl_name} = %{version}-%{release}
+Provides:       php-pecl-%{pecl_name}%{?_isa} = %{version}-%{release}
+Conflicts:      php-pecl-%{pecl_name} < %{version}-%{release}
 
 
 %description
@@ -72,7 +76,7 @@ Documentation: https://xdebug.org/docs/
 
 %prep
 %setup -qc
-mv %{pecl_name}-%{gh_commit} NTS
+mv %{pecl_name}-%{version} NTS
 mv NTS/package.xml .
 
 sed -e '/LICENSE/s/role="doc"/role="src"/' -i package.xml
@@ -80,8 +84,8 @@ sed -e '/LICENSE/s/role="doc"/role="src"/' -i package.xml
 cd NTS
 # Check extension version
 ver=$(sed -n '/XDEBUG_VERSION/{s/.* "//;s/".*$//;p}' php_xdebug.h)
-if test "$ver" != "%{upstream_version}%{?upstream_prever}%{?gh_date:-dev}"; then
-   : Error: Upstream XDEBUG_VERSION version is ${ver}, expecting %{upstream_version}%{?upstream_perver}%{?gh_date:-dev}.
+if test "$ver" != "%{version}"; then
+   : Error: Upstream XDEBUG_VERSION version is ${ver}, expecting %{version}.
    exit 1
 fi
 cd ..
@@ -134,7 +138,7 @@ install -Dpm 755 NTS/debugclient/debugclient \
         %{buildroot}%{_bindir}/debugclient
 
 # install package registration file
-install -Dpm 644 package.xml %{buildroot}%{pecl_xmldir}/%{name}.xml
+install -Dpm 644 package.xml %{buildroot}%{pecl_xmldir}/%{pecl_name}.xml
 
 # install config file
 install -Dpm 644 %{ini_name} %{buildroot}%{php_inidir}/%{ini_name}
@@ -193,11 +197,29 @@ REPORT_EXIT_STATUS=1 \
 %endif
 
 
+%triggerin -- pear1
+if [ -x %{__pecl} ]; then
+    %{pecl_install} %{pecl_xmldir}/%{pecl_name}.xml >/dev/null || :
+fi
+
+
+%posttrans
+if [ -x %{__pecl} ]; then
+    %{pecl_install} %{pecl_xmldir}/%{pecl_name}.xml >/dev/null || :
+fi
+
+
+%postun
+if [ $1 -eq 0 -a -x %{__pecl} ]; then
+    %{pecl_uninstall} %{pecl_name} >/dev/null || :
+fi
+
+
 %files
 %license NTS/LICENSE
 %doc %{pecl_docdir}/%{pecl_name}
 %{_bindir}/debugclient
-%{pecl_xmldir}/%{name}.xml
+%{pecl_xmldir}/%{pecl_name}.xml
 
 %config(noreplace) %{php_inidir}/%{ini_name}
 %{php_extdir}/%{pecl_name}.so
@@ -209,6 +231,9 @@ REPORT_EXIT_STATUS=1 \
 
 
 %changelog
+* Wed May 29 2019 Matt Linscott <matt.linscott@gmail.com> - 2.7.2-2
+- Port from Fedora to IUS
+
 * Tue May  7 2019 Remi Collet <remi@remirepo.net> - 2.7.2-1
 - update to 2.7.2
 
